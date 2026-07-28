@@ -170,7 +170,6 @@ FAQ.
 | `uninstall.py` | Drag into Maya to remove |
 | `README.md` | This file |
 | `HELP.html` | Full user guide |
-| `LICENSE` | MIT license for the importer package |
 | `kotorImporterV114.mll` | The importer plug-in (Maya 2024, 64-bit) |
 | `*.ogsfx` (16 files) | Viewport shaders — keep beside the `.mll` |
 | `kotor_importer_ui_v114.py` | The importer window |

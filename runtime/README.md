@@ -7,14 +7,6 @@ The importer reads your own installed copy of the game directly. Nothing from
 the game is included in this package, and the tool never writes to your game
 folder.
 
-## Download
-
-Download the ready-to-install package from the
-[latest GitHub release](https://github.com/janglesworthy/KotorMayaImporter/releases/latest).
-This repository is a compiled-only distribution; C++ source code is not
-included. The `runtime` folder contains the same application files as the
-release package.
-
 ## Features
 
 - **Characters** — import any player body with a head, weapons in either

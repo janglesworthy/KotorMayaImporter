@@ -1,0 +1,248 @@
+// Native KotOR 1 bumpy-shiny material for Maya Viewport 2.0.
+//
+// Retail first replaces the framebuffer with the tangent-space reflected
+// cubemap (GL_ONE, GL_ZERO), then composites the fixed-function-lighted
+// diffuse base with (GL_ONE, GL_ONE_MINUS_SRC_ALPHA):
+//
+//     lightedBase.rgb + reflectedCube.rgb * (1 - base.a)
+//
+// COLOR0/1/2 are the exact retained Odyssey T/B/N rows. The normal raster is
+// the separately derived retail byte-prefix conversion; no host bump scalar or
+// tuned reflection strength is introduced. The empty inspection scene uses
+// an explicit active Maya directional light with the same neutral 0.2 ambient
+// + 0.8 diffuse presentation weights as the ordinary native material path. Both sampled textures remain legacy
+// display-space inputs; Maya receives scene-linear output at the boundary.
+
+uniform texture2D baseMap;
+uniform texture2D normalMap;
+uniform texture2D cubePositiveX;
+uniform texture2D cubeNegativeX;
+uniform texture2D cubePositiveY;
+uniform texture2D cubeNegativeY;
+uniform texture2D cubePositiveZ;
+uniform texture2D cubeNegativeZ;
+
+uniform sampler2D baseMapSampler = sampler_state
+{
+    Texture = <baseMap>;
+    TEXTURE_MIN_FILTER = LINEAR_MIPMAP_LINEAR;
+    TEXTURE_MAG_FILTER = LINEAR;
+    TEXTURE_WRAP_S = REPEAT;
+    TEXTURE_WRAP_T = REPEAT;
+};
+uniform sampler2D normalMapSampler = sampler_state
+{
+    Texture = <normalMap>;
+    TEXTURE_MIN_FILTER = LINEAR_MIPMAP_LINEAR;
+    TEXTURE_MAG_FILTER = LINEAR;
+    TEXTURE_WRAP_S = REPEAT;
+    TEXTURE_WRAP_T = REPEAT;
+};
+uniform sampler2D cubePositiveXSampler = sampler_state
+{
+    Texture = <cubePositiveX>;
+    TEXTURE_MIN_FILTER = LINEAR_MIPMAP_LINEAR;
+    TEXTURE_MAG_FILTER = LINEAR;
+    TEXTURE_WRAP_S = CLAMP;
+    TEXTURE_WRAP_T = CLAMP;
+};
+uniform sampler2D cubeNegativeXSampler = sampler_state
+{
+    Texture = <cubeNegativeX>;
+    TEXTURE_MIN_FILTER = LINEAR_MIPMAP_LINEAR;
+    TEXTURE_MAG_FILTER = LINEAR;
+    TEXTURE_WRAP_S = CLAMP;
+    TEXTURE_WRAP_T = CLAMP;
+};
+uniform sampler2D cubePositiveYSampler = sampler_state
+{
+    Texture = <cubePositiveY>;
+    TEXTURE_MIN_FILTER = LINEAR_MIPMAP_LINEAR;
+    TEXTURE_MAG_FILTER = LINEAR;
+    TEXTURE_WRAP_S = CLAMP;
+    TEXTURE_WRAP_T = CLAMP;
+};
+uniform sampler2D cubeNegativeYSampler = sampler_state
+{
+    Texture = <cubeNegativeY>;
+    TEXTURE_MIN_FILTER = LINEAR_MIPMAP_LINEAR;
+    TEXTURE_MAG_FILTER = LINEAR;
+    TEXTURE_WRAP_S = CLAMP;
+    TEXTURE_WRAP_T = CLAMP;
+};
+uniform sampler2D cubePositiveZSampler = sampler_state
+{
+    Texture = <cubePositiveZ>;
+    TEXTURE_MIN_FILTER = LINEAR_MIPMAP_LINEAR;
+    TEXTURE_MAG_FILTER = LINEAR;
+    TEXTURE_WRAP_S = CLAMP;
+    TEXTURE_WRAP_T = CLAMP;
+};
+uniform sampler2D cubeNegativeZSampler = sampler_state
+{
+    Texture = <cubeNegativeZ>;
+    TEXTURE_MIN_FILTER = LINEAR_MIPMAP_LINEAR;
+    TEXTURE_MAG_FILTER = LINEAR;
+    TEXTURE_WRAP_S = CLAMP;
+    TEXTURE_WRAP_T = CLAMP;
+};
+
+uniform vec3 colorGain = {1.0, 1.0, 1.0};
+uniform float alphaGain = 1.0;
+uniform vec3 sourceDiffuse = {1.0, 1.0, 1.0};
+uniform vec3 sourceAmbient = {1.0, 1.0, 1.0};
+uniform float inspectionAmbientIntensity = 0.2;
+uniform float inspectionDiffuseIntensity = 0.8;
+uniform vec3 inspectionLightDirection = {0.0, 0.0, -1.0};
+uniform vec3 inspectionLightColor = {1.0, 1.0, 1.0};
+uniform float inspectionLightIntensity = 1.0;
+uniform mat4 World : world;
+uniform mat4 WorldViewProjection : worldviewprojection;
+uniform mat4 ViewInverse : viewinverse;
+
+attribute vertexInS
+{
+    vec3 Pm : POSITION;
+    vec4 encodedTm : COLOR0;
+    vec4 encodedBm : COLOR1;
+    vec4 encodedNm : COLOR2;
+    vec2 mayaUVIn : TEXCOORD0;
+}
+
+attribute vertOutS
+{
+    vec2 U0 : TEXCOORD0;
+    vec3 Pw : TEXCOORD1;
+    vec3 Nw : TEXCOORD2;
+    vec3 Tw : TEXCOORD3;
+    vec3 Bw : TEXCOORD4;
+}
+
+GLSLShader bumpyShinyVertex
+{
+    void main()
+    {
+        vec4 worldPosition = World * vec4(Pm, 1.0);
+        VS_OUT.U0 = vec2(mayaUVIn.x, 1.0 - mayaUVIn.y);
+        VS_OUT.Pw = worldPosition.xyz;
+        VS_OUT.Tw = mat3(World) * (encodedTm.rgb * 2.0 - 1.0);
+        VS_OUT.Bw = mat3(World) * (encodedBm.rgb * 2.0 - 1.0);
+        VS_OUT.Nw = mat3(World) * (encodedNm.rgb * 2.0 - 1.0);
+        gl_Position = WorldViewProjection * vec4(Pm, 1.0);
+    }
+}
+
+attribute fragInS
+{
+    vec2 U0 : TEXCOORD0;
+    vec3 Pw : TEXCOORD1;
+    vec3 Nw : TEXCOORD2;
+    vec3 Tw : TEXCOORD3;
+    vec3 Bw : TEXCOORD4;
+}
+
+attribute fragOutS
+{
+    vec4 ColorOut;
+}
+
+GLSLShader bumpyShinyPixel
+{
+    vec3 sampleRetailCube(vec3 direction)
+    {
+        vec3 d = normalize(direction);
+        vec3 a = abs(d);
+        vec2 uv;
+        if (a.x >= a.y && a.x >= a.z)
+        {
+            if (d.x >= 0.0)
+            {
+                uv = vec2(-d.z, -d.y) / a.x;
+                return texture2D(cubePositiveXSampler, uv * 0.5 + 0.5).rgb;
+            }
+            uv = vec2(d.z, -d.y) / a.x;
+            return texture2D(cubeNegativeXSampler, uv * 0.5 + 0.5).rgb;
+        }
+        if (a.y >= a.z)
+        {
+            if (d.y >= 0.0)
+            {
+                uv = vec2(d.x, d.z) / a.y;
+                return texture2D(cubePositiveYSampler, uv * 0.5 + 0.5).rgb;
+            }
+            uv = vec2(d.x, -d.z) / a.y;
+            return texture2D(cubeNegativeYSampler, uv * 0.5 + 0.5).rgb;
+        }
+        if (d.z >= 0.0)
+        {
+            uv = vec2(d.x, -d.y) / a.z;
+            return texture2D(cubePositiveZSampler, uv * 0.5 + 0.5).rgb;
+        }
+        uv = vec2(-d.x, -d.y) / a.z;
+        return texture2D(cubeNegativeZSampler, uv * 0.5 + 0.5).rgb;
+    }
+
+    float srgbChannelToLinear(float value)
+    {
+        return value <= 0.04045
+            ? value / 12.92
+            : pow((value + 0.055) / 1.055, 2.4);
+    }
+
+    vec3 srgbToLinear(vec3 value)
+    {
+        return vec3(
+            srgbChannelToLinear(value.r),
+            srgbChannelToLinear(value.g),
+            srgbChannelToLinear(value.b)
+        );
+    }
+
+    void main()
+    {
+        vec4 base = texture2D(baseMapSampler, PIX_IN.U0);
+        vec3 tangentNormal = normalize(
+            texture2D(normalMapSampler, PIX_IN.U0).rgb * 2.0 - 1.0
+        );
+        vec3 worldNormal = normalize(
+            PIX_IN.Tw * tangentNormal.x
+            + PIX_IN.Bw * tangentNormal.y
+            + PIX_IN.Nw * tangentNormal.z
+        );
+        vec3 surfaceToLight = normalize(-inspectionLightDirection);
+        float facing = max(dot(worldNormal, surfaceToLight), 0.0);
+        vec3 legacyLighting = clamp(
+            sourceAmbient * inspectionAmbientIntensity
+            + sourceDiffuse * inspectionDiffuseIntensity
+                * inspectionLightColor
+                * max(inspectionLightIntensity, 0.0)
+                * facing,
+            0.0,
+            1.0
+        );
+        vec3 eyeToSurface = PIX_IN.Pw - ViewInverse[3].xyz;
+        vec3 reflected = sampleRetailCube(
+            reflect(eyeToSurface, worldNormal)
+        );
+        float sourceAlpha = clamp(base.a * alphaGain, 0.0, 1.0);
+        vec3 legacyDisplayColor =
+            base.rgb * colorGain * legacyLighting
+            + reflected * (1.0 - sourceAlpha);
+        ColorOut = vec4(
+            srgbToLinear(clamp(legacyDisplayColor, 0.0, 1.0)),
+            1.0
+        );
+    }
+}
+
+technique Main
+<
+    string variableNameAsAttributeName = "true";
+>
+{
+    pass P0
+    {
+        VertexShader (in vertexInS, out vertOutS VS_OUT) = bumpyShinyVertex;
+        PixelShader (in fragInS PIX_IN, out fragOutS) = bumpyShinyPixel;
+    }
+}

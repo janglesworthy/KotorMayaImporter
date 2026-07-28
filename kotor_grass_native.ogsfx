@@ -1,0 +1,14 @@
+// Bounded native DCC projection of retail-generated KotOR grass cards.
+uniform texture2D atlasMap;
+uniform texture2D lightmapMap;
+uniform sampler2D atlasSampler=sampler_state{Texture=<atlasMap>;TEXTURE_MIN_FILTER=LINEAR_MIPMAP_LINEAR;TEXTURE_MAG_FILTER=LINEAR;TEXTURE_WRAP_S=CLAMP;TEXTURE_WRAP_T=CLAMP;};
+uniform sampler2D lightmapSampler=sampler_state{Texture=<lightmapMap>;TEXTURE_MIN_FILTER=LINEAR_MIPMAP_LINEAR;TEXTURE_MAG_FILTER=LINEAR;TEXTURE_WRAP_S=CLAMP;TEXTURE_WRAP_T=CLAMP;};
+uniform bool hasLightmap=true;
+uniform float grassAlphaTest=0.4000000059604645;
+uniform mat4 WorldViewProjection:worldviewprojection;
+attribute vertexInS{vec3 Pm:POSITION;vec2 mayaAtlasUV:TEXCOORD0;vec2 mayaLightmapUV:TEXCOORD1;}
+attribute vertOutS{vec2 U0:TEXCOORD0;vec2 U1:TEXCOORD1;}
+GLSLShader grassVertex{void main(){VS_OUT.U0=vec2(mayaAtlasUV.x,1.0-mayaAtlasUV.y);VS_OUT.U1=vec2(mayaLightmapUV.x,1.0-mayaLightmapUV.y);gl_Position=WorldViewProjection*vec4(Pm,1.0);}}
+attribute fragInS{vec2 U0:TEXCOORD0;vec2 U1:TEXCOORD1;} attribute fragOutS{vec4 ColorOut;}
+GLSLShader grassPixel{float linearChannel(float v){return v<=.04045?v/12.92:pow((v+.055)/1.055,2.4);}vec3 toLinear(vec3 v){return vec3(linearChannel(v.r),linearChannel(v.g),linearChannel(v.b));}void main(){vec4 atlas=texture2D(atlasSampler,PIX_IN.U0);if(atlas.a<grassAlphaTest)discard;vec3 lighting=hasLightmap?texture2D(lightmapSampler,PIX_IN.U1).rgb:vec3(1.0);ColorOut=vec4(toLinear(clamp(atlas.rgb*lighting,0.0,1.0)),atlas.a);}}
+technique Main < string Transparency="Transparent"; string supportsAdvancedTransparency="false"; string variableNameAsAttributeName="true"; >{pass P0{VertexShader(in vertexInS,out vertOutS VS_OUT)=grassVertex;PixelShader(in fragInS PIX_IN,out fragOutS)=grassPixel;}}

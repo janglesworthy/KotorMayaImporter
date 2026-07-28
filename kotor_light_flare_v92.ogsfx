@@ -1,0 +1,88 @@
+// KotOR 1 native LIGHT flare derived Viewport 2.0 projection.
+//
+// Each source row supplies one textured additive card. POSITION.xy contains
+// the authored size as a signed corner and POSITION.z contains the authored
+// screen-line position (0 = view center, 1 = source light). The 0.02 factor is
+// an explicit DCC screen-space normalization; source size/position values stay
+// unchanged on the Maya shape as audit metadata.
+
+uniform texture2D map
+<
+    string UIName = "KotOR LIGHT Flare Texture";
+    string UIWidget = "FilePicker";
+    string ResourceType = "2D";
+    string ResourceName = "";
+>;
+
+uniform sampler2D mapSampler = sampler_state
+{
+    Texture = <map>;
+    TEXTURE_MIN_FILTER = LINEAR_MIPMAP_LINEAR;
+    TEXTURE_MAG_FILTER = LINEAR;
+    TEXTURE_WRAP_S = CLAMP;
+    TEXTURE_WRAP_T = CLAMP;
+};
+
+uniform vec3 colorGain = {1.0, 1.0, 1.0};
+uniform float alphaGain = 0.5;
+uniform mat4 WorldViewProjection : worldviewprojection;
+
+attribute vertexInS
+{
+    vec3 Pm : POSITION;
+    vec2 mayaUVIn : TEXCOORD0;
+}
+
+attribute vertOutS
+{
+    vec2 U0 : TEXCOORD0;
+}
+
+GLSLShader flareBillboardVS
+{
+    void main()
+    {
+        vec4 sourceClip = WorldViewProjection * vec4(0.0, 0.0, 0.0, 1.0);
+        float safeW = abs(sourceClip.w) < 0.000001 ? 0.000001 : sourceClip.w;
+        vec2 sourceNdc = sourceClip.xy / safeW;
+        vec2 placedNdc = sourceNdc * Pm.z;
+        vec2 cornerNdc = Pm.xy * 0.02;
+        VS_OUT.U0 = vec2(mayaUVIn.x, 1.0 - mayaUVIn.y);
+        gl_Position = vec4(
+            (placedNdc + cornerNdc) * sourceClip.w,
+            sourceClip.z,
+            sourceClip.w
+        );
+    }
+}
+
+attribute fragInS
+{
+    vec2 U0 : TEXCOORD0;
+}
+
+attribute fragOutS
+{
+    vec4 ColorOut;
+}
+
+GLSLShader flareTexturePS
+{
+    void main()
+    {
+        vec4 sampled = texture(mapSampler, clamp(PIX_IN.U0, vec2(0.0), vec2(1.0)));
+        ColorOut = vec4(sampled.rgb * colorGain, sampled.a * alphaGain);
+    }
+}
+
+technique Main
+<
+    string Transparency = "Transparent";
+>
+{
+    pass P0
+    {
+        VertexShader (in vertexInS, out vertOutS VS_OUT) = flareBillboardVS;
+        PixelShader (in fragInS PIX_IN, out fragOutS) = flareTexturePS;
+    }
+}

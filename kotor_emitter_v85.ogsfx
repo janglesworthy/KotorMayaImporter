@@ -1,0 +1,374 @@
+// KotOR 1 bounded EMITTER projections.
+//
+// Mode 0 preserves the passed V81 Single / Aligned_to_World_Z / Lighten
+// projection. Mode 1 preserves the passed V82-V84 Fountain families and adds
+// exact-source v_shockwave_imp behavior: its model-local birthrate shutdown,
+// nonzero spread/random velocity, and retail Punch-Through alpha test.
+// The MDL does not store retail's process-global rand() state, so the source
+// extension offset supplies a reproducible import sequence while every lattice
+// and range remains exact.
+
+uniform texture2D map
+<
+    string UIName = "KotOR EMITTER Atlas";
+    string UIWidget = "FilePicker";
+    string ResourceType = "2D";
+    string ResourceName = "";
+>;
+
+uniform sampler2D mapSampler = sampler_state
+{
+    Texture = <map>;
+    TEXTURE_MIN_FILTER = LINEAR_MIPMAP_LINEAR;
+    TEXTURE_MAG_FILTER = LINEAR;
+    TEXTURE_WRAP_S = CLAMP;
+    TEXTURE_WRAP_T = CLAMP;
+};
+
+uniform float cycleFrame = 0.0;
+uniform float gridX = 1.0;
+uniform float gridY = 1.0;
+uniform vec3 colorGain = {1.0, 1.0, 1.0};
+uniform float alphaGain = 1.0;
+uniform float projectionMode = 0.0;
+uniform float punchthroughMode = 0.0;
+uniform float birthRate = 0.0;
+uniform float lifeExp = -1.0;
+uniform float particleVelocity = 0.0;
+uniform float randomVelocity = 0.0;
+uniform float spread = 0.0;
+uniform float birthRateHoldEnd = -1.0;
+uniform float birthRateEnd = -1.0;
+uniform float frameStart = 0.0;
+uniform float frameEnd = 0.0;
+uniform float particleSlotCount = 1.0;
+uniform float randomSeed = 0.0;
+uniform float spawnXSize = 0.0;
+uniform float spawnYSize = 0.0;
+uniform float sizeStart = 0.0;
+uniform float sizeMid = 0.0;
+uniform float sizeEnd = 0.0;
+uniform float alphaStart = 1.0;
+uniform float alphaMid = 1.0;
+uniform float alphaEnd = 1.0;
+uniform float percentStart = 0.0;
+uniform float percentMid = 0.0;
+uniform float percentEnd = 1.0;
+uniform vec3 colorStart = {1.0, 1.0, 1.0};
+uniform vec3 colorMid = {1.0, 1.0, 1.0};
+uniform vec3 colorEnd = {1.0, 1.0, 1.0};
+uniform mat4 World : world;
+uniform mat4 ViewInverse : viewinverse;
+uniform mat4 ViewProjection : viewprojection;
+
+attribute vertexInS
+{
+    vec3 Pm : POSITION;
+    vec4 particleData : COLOR0;
+    vec2 mayaUVIn : TEXCOORD0;
+}
+
+attribute vertOutS
+{
+    vec2 U0 : TEXCOORD0;
+    float AtlasFrame : TEXCOORD1;
+    float Visible : TEXCOORD2;
+    float ParticleAlpha : TEXCOORD3;
+    vec3 ParticleColor : TEXCOORD4;
+}
+
+GLSLShader emitterVS
+{
+    void main()
+    {
+        vec3 positionWorld;
+        float atlasFrame = cycleFrame;
+        float visible = 1.0;
+        float particleAlpha = 1.0;
+        vec3 particleColor = vec3(1.0, 1.0, 1.0);
+        if (projectionMode < 0.5)
+        {
+            vec3 centerWorld = (World * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
+            vec3 cameraWorld = vec3(
+                ViewInverse[0][3],
+                ViewInverse[1][3],
+                ViewInverse[2][3]
+            );
+            vec3 toCamera = cameraWorld - centerWorld;
+            vec3 horizontal = cross(vec3(0.0, 0.0, 1.0), toCamera);
+            if (dot(horizontal, horizontal) < 0.000001)
+            {
+                horizontal = vec3(1.0, 0.0, 0.0);
+            }
+            else
+            {
+                horizontal = normalize(horizontal);
+            }
+            positionWorld = centerWorld +
+                horizontal * Pm.x + vec3(0.0, 0.0, 1.0) * Pm.z;
+        }
+        else
+        {
+            float safeBirthRate = max(birthRate, 0.000001);
+            float safeLife = max(lifeExp, 0.000001);
+            float safeSlots = max(particleSlotCount, 1.0);
+            float elapsed = max(cycleFrame, 0.0);
+            float slot = floor(
+                clamp(particleData.r, 0.0, 0.999999) * safeSlots
+            );
+            bool animatedBirthRate = birthRateHoldEnd >= 0.0 &&
+                birthRateEnd > birthRateHoldEnd;
+            float cumulativeBirths;
+            if (animatedBirthRate)
+            {
+                float clampedBirthTime = min(elapsed, birthRateEnd);
+                cumulativeBirths = safeBirthRate *
+                    min(clampedBirthTime, birthRateHoldEnd);
+                if (clampedBirthTime > birthRateHoldEnd)
+                {
+                    float rampDuration = birthRateEnd - birthRateHoldEnd;
+                    float rampTime = clampedBirthTime - birthRateHoldEnd;
+                    cumulativeBirths += safeBirthRate * (
+                        rampTime - rampTime * rampTime /
+                        (2.0 * rampDuration)
+                    );
+                }
+            }
+            else
+            {
+                cumulativeBirths = elapsed * safeBirthRate;
+            }
+            float completedBirths = floor(cumulativeBirths + 0.00001);
+            float birthCycle = floor(
+                (completedBirths - 1.0 - slot) / safeSlots
+            );
+            float birthIndex = slot + birthCycle * safeSlots;
+            float birthTarget = birthIndex + 1.0;
+            float birthTime;
+            if (animatedBirthRate)
+            {
+                float holdBirths = safeBirthRate * birthRateHoldEnd;
+                if (birthTarget <= holdBirths)
+                {
+                    birthTime = birthTarget / safeBirthRate;
+                }
+                else
+                {
+                    float rampDuration = birthRateEnd - birthRateHoldEnd;
+                    float normalizedRampBirths =
+                        (birthTarget - holdBirths) /
+                        (safeBirthRate * rampDuration);
+                    birthTime = birthRateHoldEnd + rampDuration * (
+                        1.0 - sqrt(max(0.0, 1.0 - 2.0 * normalizedRampBirths))
+                    );
+                }
+            }
+            else
+            {
+                birthTime = birthTarget / safeBirthRate;
+            }
+            float age = elapsed - birthTime;
+            if (birthIndex < 0.0 || age < 0.0 || age >= safeLife)
+            {
+                visible = 0.0;
+                age = 0.0;
+            }
+
+            // Retail FUN_0048d870: int(size*100), halve, choose a magnitude,
+            // multiply by 0.0001, then apply an independent sign.
+            float xUnit = fract(sin(
+                (birthIndex + 1.0) * 12.9898 + randomSeed * 78.233
+            ) * 43758.5453);
+            float xSignUnit = fract(sin(
+                (birthIndex + 1.0) * 39.3467 + randomSeed * 11.135
+            ) * 24634.6345);
+            float yUnit = fract(sin(
+                (birthIndex + 1.0) * 73.1569 + randomSeed * 19.719
+            ) * 56445.2341);
+            float ySignUnit = fract(sin(
+                (birthIndex + 1.0) * 91.9345 + randomSeed * 43.117
+            ) * 12414.6732);
+            float xModulus = floor(max(spawnXSize, 0.0) * 50.0 + 0.00001);
+            float yModulus = floor(max(spawnYSize, 0.0) * 50.0 + 0.00001);
+            float spawnX = xModulus < 1.0
+                ? 0.0
+                : floor(xUnit * xModulus) * 0.0001 *
+                  (xSignUnit < 0.5 ? -1.0 : 1.0);
+            float spawnY = yModulus < 1.0
+                ? 0.0
+                : floor(yUnit * yModulus) * 0.0001 *
+                  (ySignUnit < 0.5 ? -1.0 : 1.0);
+
+            // Retail Fountain initialization chooses an integer magnitude from
+            // int(randvel*100), scales by 0.01, and applies an independent sign.
+            float velocityUnit = fract(sin(
+                (birthIndex + 1.0) * 51.713 + randomSeed * 31.337
+            ) * 51283.1731);
+            float velocitySignUnit = fract(sin(
+                (birthIndex + 1.0) * 67.191 + randomSeed * 17.573
+            ) * 28411.5273);
+            float velocityModulus = floor(
+                max(randomVelocity, 0.0) * 100.0 + 0.00001
+            );
+            float signedRandomVelocity = velocityModulus < 1.0
+                ? 0.0
+                : floor(velocityUnit * velocityModulus) * 0.01 *
+                  (velocitySignUnit < 0.5 ? -1.0 : 1.0);
+
+            // Retail FUN_0048de60: polar spread uses int(spread*100) on a
+            // 0.01-radian lattice, followed by an independent 0..627
+            // azimuth on the same lattice. The two source-basis axis-angle
+            // rotations reduce to this local direction for Fountain velocity.
+            float spreadUnit = fract(sin(
+                (birthIndex + 1.0) * 31.517 + randomSeed * 47.193
+            ) * 41817.3217);
+            float azimuthUnit = fract(sin(
+                (birthIndex + 1.0) * 87.413 + randomSeed * 29.731
+            ) * 37141.9173);
+            float spreadModulus = floor(max(spread, 0.0) * 100.0 + 0.00001);
+            float polarAngle = spreadModulus < 1.0
+                ? 0.0
+                : floor(spreadUnit * spreadModulus) * 0.01;
+            float azimuthAngle = floor(azimuthUnit * 628.0) * 0.01;
+            vec3 particleDirection = spreadModulus < 1.0
+                ? vec3(0.0, 0.0, 1.0)
+                : vec3(
+                    sin(polarAngle) * sin(azimuthAngle),
+                    -sin(polarAngle) * cos(azimuthAngle),
+                    cos(polarAngle)
+                );
+
+            float normalizedAge = clamp(age / safeLife, 0.0, 1.0);
+            float particleSize;
+            if (normalizedAge <= percentStart)
+            {
+                particleSize = sizeStart;
+                particleAlpha = alphaStart;
+                particleColor = colorStart;
+            }
+            else if (normalizedAge < percentMid)
+            {
+                float amount = (normalizedAge - percentStart) /
+                    max(percentMid - percentStart, 0.000001);
+                particleSize = mix(sizeStart, sizeMid, amount);
+                particleAlpha = mix(alphaStart, alphaMid, amount);
+                particleColor = mix(colorStart, colorMid, amount);
+            }
+            else if (normalizedAge < percentEnd)
+            {
+                float amount = (normalizedAge - percentMid) /
+                    max(percentEnd - percentMid, 0.000001);
+                particleSize = mix(sizeMid, sizeEnd, amount);
+                particleAlpha = mix(alphaMid, alphaEnd, amount);
+                particleColor = mix(colorMid, colorEnd, amount);
+            }
+            else
+            {
+                particleSize = sizeEnd;
+                particleAlpha = alphaEnd;
+                particleColor = colorEnd;
+            }
+
+            vec3 centerWorld = (
+                World * vec4(
+                    vec3(spawnX, spawnY, 0.0) +
+                    particleDirection *
+                    (particleVelocity + signedRandomVelocity) * age,
+                    1.0
+                )
+            ).xyz;
+            vec3 cameraRight = normalize(ViewInverse[0].xyz);
+            vec3 cameraUp = normalize(ViewInverse[1].xyz);
+            if (dot(cameraRight, cameraRight) < 0.000001)
+            {
+                cameraRight = vec3(1.0, 0.0, 0.0);
+            }
+            if (dot(cameraUp, cameraUp) < 0.000001)
+            {
+                cameraUp = vec3(0.0, 1.0, 0.0);
+            }
+            positionWorld = centerWorld +
+                cameraRight * Pm.x * particleSize +
+                cameraUp * Pm.y * particleSize;
+
+            // Random-frame selects once at birth and does not advance with fps.
+            if (frameEnd > frameStart)
+            {
+                float randomFrameUnit = fract(sin(
+                    (birthIndex + 1.0) * 23.917 + randomSeed * 63.531
+                ) * 31941.7263);
+                float randomSpan = frameEnd - frameStart + 1.0;
+                atlasFrame = frameStart + floor(randomFrameUnit * randomSpan);
+            }
+            else
+            {
+                atlasFrame = frameStart;
+            }
+        }
+        VS_OUT.U0 = vec2(mayaUVIn.x, 1.0 - mayaUVIn.y);
+        VS_OUT.AtlasFrame = atlasFrame;
+        VS_OUT.Visible = visible;
+        VS_OUT.ParticleAlpha = particleAlpha;
+        VS_OUT.ParticleColor = particleColor;
+        gl_Position = ViewProjection * vec4(positionWorld, 1.0);
+    }
+}
+
+attribute fragInS
+{
+    vec2 U0 : TEXCOORD0;
+    float AtlasFrame : TEXCOORD1;
+    float Visible : TEXCOORD2;
+    float ParticleAlpha : TEXCOORD3;
+    vec3 ParticleColor : TEXCOORD4;
+}
+
+attribute fragOutS
+{
+    vec4 ColorOut;
+}
+
+GLSLShader emitterAtlasPS
+{
+    void main()
+    {
+        if (PIX_IN.Visible < 0.5)
+        {
+            discard;
+        }
+        float safeGridX = max(gridX, 1.0);
+        float safeGridY = max(gridY, 1.0);
+        float frameCount = safeGridX * safeGridY;
+        float frame = mod(floor(PIX_IN.AtlasFrame + 0.5), frameCount);
+        float column = mod(frame, safeGridX);
+        float row = floor(frame / safeGridX);
+        vec2 localUV = clamp(PIX_IN.U0, vec2(0.0), vec2(0.999999));
+        vec2 atlasUV = vec2(
+            (localUV.x + column) / safeGridX,
+            (localUV.y + row) / safeGridY
+        );
+        vec4 sampled = texture(mapSampler, atlasUV);
+        float finalAlpha = sampled.a * alphaGain * PIX_IN.ParticleAlpha;
+        if (punchthroughMode > 0.5 && finalAlpha <= 0.349999994)
+        {
+            discard;
+        }
+        ColorOut = vec4(
+            sampled.rgb * colorGain * PIX_IN.ParticleColor,
+            finalAlpha
+        );
+    }
+}
+
+technique Main
+<
+    string Transparency = "Transparent";
+>
+{
+    pass P0
+    {
+        VertexShader (in vertexInS, out vertOutS VS_OUT) = emitterVS;
+        PixelShader (in fragInS PIX_IN, out fragOutS) = emitterAtlasPS;
+    }
+}
+

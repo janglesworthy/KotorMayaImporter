@@ -1,0 +1,132 @@
+// KotOR room diffuse/lightmap projection for Maya Viewport 2.0.
+//
+// Odyssey's room MDX stores diffuse and lightmap UV streams independently.
+// This effect samples both authored streams, performs the legacy texture-stage
+// modulation, and converts only the completed display-space color to the
+// scene-linear value expected by Maya's color-managed viewport.
+
+uniform texture2D map
+<
+    string UIName = "KotOR Diffuse Texture";
+    string UIWidget = "FilePicker";
+    string ResourceType = "2D";
+    string ResourceName = "";
+>;
+
+uniform sampler2D mapSampler = sampler_state
+{
+    Texture = <map>;
+    TEXTURE_MIN_FILTER = LINEAR_MIPMAP_LINEAR;
+    TEXTURE_MAG_FILTER = LINEAR;
+    TEXTURE_WRAP_S = REPEAT;
+    TEXTURE_WRAP_T = REPEAT;
+};
+
+uniform texture2D lightmap
+<
+    string UIName = "KotOR Lightmap Texture";
+    string UIWidget = "FilePicker";
+    string ResourceType = "2D";
+    string ResourceName = "";
+>;
+
+uniform sampler2D lightmapSampler = sampler_state
+{
+    Texture = <lightmap>;
+    TEXTURE_MIN_FILTER = LINEAR_MIPMAP_LINEAR;
+    TEXTURE_MAG_FILTER = LINEAR;
+    TEXTURE_WRAP_S = CLAMP;
+    TEXTURE_WRAP_T = CLAMP;
+};
+
+uniform float useLightmap = 1.0;
+uniform mat4 WorldViewProjection : worldviewprojection;
+
+attribute vertexInS
+{
+    vec3 Pm : POSITION;
+    vec2 mayaDiffuseUV : TEXCOORD0;
+    vec2 mayaLightmapUV : TEXCOORD1;
+}
+
+attribute vertOutS
+{
+    vec2 diffuseUV : TEXCOORD0;
+    vec2 lightmapUV : TEXCOORD1;
+}
+
+GLSLShader roomVertex
+{
+    void main()
+    {
+        VS_OUT.diffuseUV = vec2(mayaDiffuseUV.x, 1.0 - mayaDiffuseUV.y);
+        VS_OUT.lightmapUV = vec2(
+            mayaLightmapUV.x,
+            1.0 - mayaLightmapUV.y
+        );
+        gl_Position = WorldViewProjection * vec4(Pm, 1.0);
+    }
+}
+
+attribute fragInS
+{
+    vec2 diffuseUV : TEXCOORD0;
+    vec2 lightmapUV : TEXCOORD1;
+}
+
+attribute fragOutS
+{
+    vec4 ColorOut;
+}
+
+GLSLShader roomPixel
+{
+    float srgbChannelToLinear(float value)
+    {
+        return value <= 0.04045
+            ? value / 12.92
+            : pow((value + 0.055) / 1.055, 2.4);
+    }
+
+    vec3 srgbToLinear(vec3 value)
+    {
+        return vec3(
+            srgbChannelToLinear(value.r),
+            srgbChannelToLinear(value.g),
+            srgbChannelToLinear(value.b)
+        );
+    }
+
+    void main()
+    {
+        vec4 diffuseSample = texture2D(mapSampler, PIX_IN.diffuseUV);
+        vec3 lightmapSample = texture2D(
+            lightmapSampler,
+            PIX_IN.lightmapUV
+        ).rgb;
+        vec3 legacyLight = mix(
+            vec3(1.0),
+            lightmapSample,
+            clamp(useLightmap, 0.0, 1.0)
+        );
+        vec3 legacyDisplayColor = diffuseSample.rgb * legacyLight;
+        ColorOut = vec4(
+            srgbToLinear(clamp(legacyDisplayColor, 0.0, 1.0)),
+            1.0
+        );
+    }
+}
+
+technique Main
+<
+    string customSemantics =
+        "TEXCOORD0=kotorDiffuseUV TEXCOORD1=kotorLightmapUV";
+    string variableNameAsAttributeName = "true";
+>
+{
+    pass P0
+    {
+        VertexShader (in vertexInS, out vertOutS VS_OUT) = roomVertex;
+        PixelShader (in fragInS PIX_IN, out fragOutS) = roomPixel;
+    }
+}

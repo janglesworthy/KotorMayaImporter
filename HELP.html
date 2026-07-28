@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KotOR Maya Importer (V114) — User Guide</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font-family: "Segoe UI", Arial, sans-serif; line-height: 1.55;
+         max-width: 860px; margin: 0 auto; padding: 24px 20px 80px; }
+  h1 { border-bottom: 2px solid #888; padding-bottom: 8px; }
+  h2 { margin-top: 2.2em; border-bottom: 1px solid #8884; padding-bottom: 4px; }
+  h3 { margin-top: 1.6em; }
+  code, kbd { font-family: Consolas, monospace; background: #8882;
+              padding: 1px 5px; border-radius: 4px; }
+  table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+  th, td { border: 1px solid #8886; padding: 6px 10px; text-align: left;
+           vertical-align: top; }
+  th { background: #8882; }
+  .tip { background: #4a83; border-left: 4px solid #48a; padding: 8px 12px;
+         margin: 12px 0; border-radius: 0 6px 6px 0; }
+  .warn { background: #a743; border-left: 4px solid #a74; padding: 8px 12px;
+          margin: 12px 0; border-radius: 0 6px 6px 0; }
+  nav ul { columns: 2; }
+  footer { margin-top: 60px; font-size: 0.85em; opacity: 0.8;
+           border-top: 1px solid #8884; padding-top: 12px; }
+</style>
+</head>
+<body>
+
+<h1>KotOR Maya Importer (V114) — User Guide</h1>
+
+<p>This tool imports characters, standalone props, animations, and complete levels from
+<em>Star Wars: Knights of the Old Republic</em> into Autodesk Maya&nbsp;2024.
+It reads your own installed copy of the game and never changes anything in
+the game folder.</p>
+
+<nav>
+<ul>
+  <li><a href="#setup">Getting set up</a></li>
+  <li><a href="#window">The window at a glance</a></li>
+  <li><a href="#formats">Supported game data</a></li>
+  <li><a href="#character">Character tab</a></li>
+  <li><a href="#prop">Prop tab</a></li>
+  <li><a href="#animations">Animations tab</a></li>
+  <li><a href="#level">Level tab</a></li>
+  <li><a href="#result">Result panel</a></li>
+  <li><a href="#dialogs">Dialogs you may see</a></li>
+  <li><a href="#tips">Tips</a></li>
+  <li><a href="#trouble">Troubleshooting</a></li>
+  <li><a href="#faq">FAQ</a></li>
+</ul>
+</nav>
+
+<h2 id="setup">Getting set up</h2>
+
+<p>After installing (drag <code>install.py</code> into the Maya viewport —
+see the README), open the window from the <strong>KotOR</strong> menu or the
+<strong>KotOR</strong> shelf button. The <strong>Setup</strong> section at
+the top needs only the plug-in and game location, remembered between
+sessions:</p>
+
+<table>
+<tr><th>Field</th><th>What to do</th></tr>
+<tr><td><strong>Plug-in</strong></td>
+<td>Press <strong>Load</strong> once. The status shows
+<code>Loaded (114.0.0), shaders found</code> when everything is in order.
+The viewport shaders are found automatically — there is nothing else to
+configure.</td></tr>
+<tr><td><strong>KotOR install</strong></td>
+<td>Your game folder — the one containing <code>chitin.key</code> and
+<code>swkotor.exe</code>. Typical locations:<br>
+GOG: <code>C:/GOG Games/Star Wars - KotOR</code><br>
+Steam: <code>C:/Program Files (x86)/Steam/steamapps/common/swkotor</code></td></tr>
+</table>
+
+<p>There is no Export folder setting. Maya needs decoded image and audio
+files on disk, so the importer manages them automatically under
+<code>Documents/maya/KotorMayaImporterCache/V114</code>. Use
+<strong>Open Import Cache</strong> after an import when you need the exact
+location.</p>
+
+<div class="tip"><strong>Tip:</strong> hover over any field or button in the
+window — every control has a tooltip explaining exactly what it does.</div>
+
+<h2 id="window">The window at a glance</h2>
+
+<ul>
+  <li><strong>Setup</strong> — load the plug-in and locate KotOR.</li>
+  <li><strong>Character</strong> tab — import an appearance-backed player
+      body, NPC, creature, or droid.</li>
+  <li><strong>Prop</strong> tab — import a standalone installed model as
+      static geometry.</li>
+  <li><strong>Animations</strong> tab — list and inspect animation clips,
+      and pick one for the character import.</li>
+  <li><strong>Level</strong> tab — import a complete level and control what
+      is visible.</li>
+  <li><strong>Result</strong> — a summary of the last import, with buttons
+      to open the managed cache and the log.</li>
+</ul>
+
+<h2 id="formats">Supported game data</h2>
+
+<p>The importer reads the following KotOR 1 formats directly from the selected
+game installation:</p>
+
+<table>
+<tr><th>Category</th><th>Formats and content</th></tr>
+<tr><td>Archives and indexes</td><td><code>KEY</code>, <code>BIF</code>,
+<code>RIM</code>, and <code>ERF</code></td></tr>
+<tr><td>Models and animation</td><td>Binary <code>MDL</code> and
+<code>MDX</code>, including meshes, skeletons, skin weights, clips, events,
+rooms, equipment, lights, emitters, dangly meshes, AABB trees, and lightsaber
+data</td></tr>
+<tr><td>Textures and materials</td><td><code>TPC</code>, <code>TGA</code>,
+and <code>TXI</code>, including diffuse textures, alpha, lightmaps,
+environment maps, bump materials, water, grass, additive and punch-through
+materials, and animated texture sequences</td></tr>
+<tr><td>Tables and names</td><td><code>2DA</code> and <code>TLK</code></td></tr>
+<tr><td>Level layout</td><td><code>LYT</code>, <code>VIS</code>, and
+<code>WOK</code></td></tr>
+<tr><td>Levels and objects</td><td><code>IFO</code>, <code>ARE</code>,
+<code>GIT</code>, <code>UTC</code>, <code>UTP</code>, <code>UTD</code>,
+<code>UTI</code>, <code>UTS</code>, <code>UTW</code>, <code>UTT</code>,
+<code>UTE</code>, and <code>UTM</code></td></tr>
+<tr><td>Audio</td><td>WAV audio and KotOR's packaged MPEG-compressed sound
+streams, imported as Maya audio nodes</td></tr>
+</table>
+
+<p>The result is a native Maya scene. The importer does not export or write
+game files.</p>
+
+<p>Every <code>...</code> button opens a browser with a live filter box —
+start typing to narrow the list, then double-click an entry (or select it
+and press <strong>Select</strong>).</p>
+
+<h2 id="character">Character tab</h2>
+
+<p>Two ways to import, chosen with the buttons at the top:</p>
+
+<h3>Manual model</h3>
+
+<p>You choose each character piece yourself. Only <strong>Model</strong> is required —
+everything else is optional.</p>
+
+<table>
+<tr><th>Field</th><th>Meaning</th></tr>
+<tr><td>Model</td><td>An installed character body or race model referenced by
+<code>appearance.2da</code>. Standalone models belong on the Prop tab;
+player bodies commonly start with <code>pmb</code> (male) or
+<code>pfb</code> (female).</td></tr>
+<tr><td>Head</td><td>A separate head, attached at the body's head
+attachment point. Browse starts on male heads (<code>pmh</code>) — change
+the filter to <code>pfh</code> for female heads. Leave empty for models
+with a built-in head.</td></tr>
+<tr><td>Body texture</td><td>An exact texture to use on the body. Browse
+starts filtered to the current model's name, because body textures are
+named after the body they fit.</td></tr>
+<tr><td>Right hand / Left hand</td><td>An item to place in each hand
+(browse starts on weapons, <code>w_</code>). The body must have the
+matching hand attachment point — most humanoid bodies do.</td></tr>
+<tr><td>Mask/goggles</td><td>A head-slot item (browse starts on
+<code>i_mask</code>). Requires a separate Head with a goggle attachment
+point.</td></tr>
+</table>
+
+<h3>NPC / creature</h3>
+
+<p>Import anyone from the game with everything they wear and carry, exactly
+as the game defines them.</p>
+
+<ul>
+  <li><strong>Creature <code>...</code></strong> with the level field empty
+  browses <em>every</em> NPC, creature, and droid in the game — over 1,600
+  entries, with the filter box to search. Picking one fills everything
+  in.</li>
+  <li>Or pick a <strong>Level (module)</strong> first to browse just that
+  level's inhabitants.</li>
+</ul>
+
+<h3>Shared fields</h3>
+
+<table>
+<tr><th>Field</th><th>Meaning</th></tr>
+<tr><td>Label</td><td>Names the imported group in your scene and its managed
+cache subfolder. Filled automatically from your choices if you leave it
+empty — it's just a name, it doesn't change what gets imported.</td></tr>
+<tr><td>Animation</td><td>Optional. One clip, baked as regular Maya
+keyframes at 30&nbsp;fps during the import. Use <strong>Choose...</strong>
+(or the Animations tab) to pick from the model's real clip list. Leave
+empty for the bind pose.</td></tr>
+</table>
+
+<p>Press <strong>Import Character / Model</strong>. The result appears as a
+single group in your scene named
+<code>KOTOR_STARTER_PLAYER_&lt;LABEL&gt;_ROOT</code>.</p>
+
+<h2 id="prop">Prop tab</h2>
+
+<p>The Prop tab separates standalone installed models from character bodies
+and heads using the game's own <code>appearance.2da</code> and
+<code>heads.2da</code> tables. Choose a model, optionally change its label,
+then press <strong>Import Prop / Standalone</strong>.</p>
+
+<p>Props are always static: no character joints, skin binding, or animation
+is invented. The result is one
+<code>KOTOR_PROP_&lt;LABEL&gt;_ROOT</code>. Every authored rendered texture must
+be checked against the selected KotOR installation. If the retail installation
+itself lacks an authored texture, V114 still imports the exact source geometry,
+uses its source diffuse color, and shows a successful-import warning with the
+exact missing resref. It never substitutes a white material, copied asset, or
+guessed texture.</p>
+
+<h2 id="animations">Animations tab</h2>
+
+<ol>
+  <li>Enter or browse a <strong>Model</strong>, then press
+  <strong>List</strong> — every clip that model can play appears, including
+  clips inherited from its base skeleton.</li>
+  <li>Click a clip to see its details (length, transition time, where it
+  comes from, how many events it carries).</li>
+  <li><strong>Import + Play</strong> imports that exact model and clip,
+  bakes it as Maya keys, and starts continuous timeline playback. If an
+  imported character is already active, the UI preserves it until the new
+  import succeeds, then replaces it. No overlapping review copy or
+  nonempty-scene dialog is created.</li>
+  <li><strong>Set Only</strong> puts the model and clip on the Character
+  tab without importing — it bakes on that tab's next import.</li>
+  <li><strong>Bind Pose</strong> stops playback and resets the
+  selected/current imported character to its recorded bind pose. It removes
+  only that character's joint animation curves and also clears the Character
+  tab's next-import animation field. If several imported characters exist,
+  select the root you want (or anything below it) first.</li>
+  <li><strong>Events</strong> prints the clip's event list to the
+  Result panel. Events are information only — they never fire.</li>
+</ol>
+
+<p>Listing, selecting, and inspecting are read-only: they never change your
+scene. Only the explicit <strong>Import + Play</strong> button imports and
+starts playback.</p>
+
+<h2 id="axis">Maya Y-up / KotOR Z-up</h2>
+
+<p>The <strong>Global up axis</strong> button in Setup shows the current
+working convention and switches Maya globally between <strong>Maya
+Y-up</strong> and <strong>KotOR Z-up</strong>. Maya rotates its working views;
+the importer does not rotate or rewrite existing scene objects or source
+transforms.</p>
+
+<h2 id="level">Level tab</h2>
+
+<ol>
+  <li><strong>Level (module) <code>...</code></strong> — pick from the list
+  of levels installed with your game. The <strong>Area</strong> field fills
+  in automatically.</li>
+  <li>Leave <strong>Baked lighting</strong> on for the game's baked light
+  look, or turn it off for plain textures.</li>
+  <li>Press <strong>Import Full Level</strong>.</li>
+</ol>
+
+<p>The level arrives as one group,
+<code>KOTOR_LEVEL_&lt;AREA&gt;_ROOT</code>, organized into subgroups
+(rooms, doors and placeables, creatures, cameras, sounds, and so on).</p>
+
+<p>After a successful level import, the panel turns off any stale Maya
+isolate-view state and frames the ordinary room core. Enormous authored sky
+or space shells remain imported and visible, but they are excluded from the
+automatic framing calculation so the actual level cannot appear missing or
+as a tiny dot.</p>
+
+<p>KotOR 1 swoop/minigame modules are complete level imports too. Taris,
+Tatooine, and Manaan include their installed track hooks, obstacle placements,
+rendered obstacle models, and hidden source collision volumes. The importer
+does not invent offsets or bundle any game asset.</p>
+
+<p>KotOR 1 cinematic/STUNT modules retain authored no-model room entries,
+native reference nodes, source-only emitter markers, sky textures, optional
+walkmesh data, additive displays, and partially transparent placeables.
+Missing authored lightmaps are reported as source warnings while the level
+still imports. After a successful import the panel forces a Viewport 2.0
+refresh so newly connected file and shader graphs draw immediately.</p>
+
+<h3>Show in scene</h3>
+
+<p>The importer always brings in the <em>complete</em> level. The
+checkboxes control what is <em>visible</em> afterwards — unchecked parts
+are hidden, not skipped, and nothing is ever deleted:</p>
+
+<ul>
+  <li>Ticked by default: rooms, doors &amp; placeables, NPCs / creatures,
+  grass, lights, particle FX, water — what the game shows.</li>
+  <li>Unticked by default: waypoints, stores &amp; items, triggers &amp;
+  encounters, cameras, sounds, source collision — markers and technical
+  extras, including walkmesh and minigame obstacle audit geometry.</li>
+  <li><strong>Everything</strong> / <strong>Area only</strong> are one-click
+  presets; <strong>Apply</strong> re-applies your choices to the level
+  already in the scene, any time.</li>
+</ul>
+
+<h2 id="result">Result panel</h2>
+
+<p>After every import the Result panel shows the import summary (counts of
+meshes, textures, joints, and so on), the imported-root count, and — for
+levels — which parts were hidden by your Show-in-scene choices.
+<strong>Open Import Cache</strong> and
+<strong>Open Log</strong> jump straight to the files the import wrote.</p>
+
+<p><strong>PROP IMPORTED - RETAIL ASSET INCOMPLETE</strong> means the prop
+did import, but the installed retail data lacks one or more authored textures.
+The result and warning list those resrefs; the affected surface uses source
+diffuse color and no substitute asset. <strong>LEVEL IMPORTED WITH SOURCE
+WARNINGS</strong> likewise means the level imported successfully. Open the log
+to review retained source-only emitters or missing authored lightmaps.</p>
+
+<h2 id="dialogs">Dialogs you may see</h2>
+
+<table>
+<tr><th>Dialog</th><th>Why, and what to do</th></tr>
+<tr><td>“Cannot import” with a list</td>
+<td>Something needed is missing (a required field is empty,
+the plug-in not loaded). Each line says exactly what to fix.</td></tr>
+<tr><td>“CONFLICT: … loaded”</td>
+<td>An older version of the importer plug-in is loaded. Start a new scene,
+unload the old version in <em>Windows &gt; Settings/Preferences &gt;
+Plug-in Manager</em>, then press Load again.</td></tr>
+</table>
+
+<h2 id="tips">Tips</h2>
+
+<ul>
+  <li>Imports may coexist in one scene without a warning. Levels especially
+  can contain thousands of objects, so keep only what the scene actually
+  needs. <strong>Import + Play</strong> automatically replaces the active
+  review character after a successful animated import.</li>
+  <li>View imports with <strong>Viewport 2.0</strong>, Smooth Shading, and
+  <em>Textured</em> display on (press <kbd>6</kbd>). That's what the
+  materials are built for.</li>
+  <li>Imported sounds don't play by themselves — select a sound and use
+  Maya's time-slider audio controls.</li>
+  <li>Saved scenes keep working as long as the importer stays installed and
+  its managed cache (which holds the textures) stays where it was.</li>
+  <li>Sharing a scene with someone else? They need this package installed
+  too, plus the relevant managed-cache folder or repathed textures.</li>
+</ul>
+
+<h2 id="trouble">Troubleshooting</h2>
+
+<table>
+<tr><th>Problem</th><th>Fix</th></tr>
+<tr><td>Load says the plug-in failed</td>
+<td>Confirm you're on Maya 2024 (64-bit, Windows) and that the
+<code>.mll</code> still has all 16 <code>.ogsfx</code> files beside it.
+If Windows blocked the downloaded file: right-click the <code>.mll</code>
+&gt; Properties &gt; Unblock. Reinstalling (drag <code>install.py</code>
+again) restores a complete set.</td></tr>
+<tr><td>Status says shader files are missing</td>
+<td>The <code>.mll</code> and its 16 <code>.ogsfx</code> files must stay in
+one folder. Reinstall to restore them.</td></tr>
+<tr><td>“That folder has no chitin.key”</td>
+<td>KotOR install must point at the game's main folder, not a subfolder
+like <code>data</code> or <code>modules</code> and not the launcher
+folder.</td></tr>
+<tr><td>Materials look green, white, or flat</td>
+<td>Switch to Viewport 2.0 with textured display (press <kbd>6</kbd>).
+Use <strong>Open Import Cache</strong> and confirm that import's cache still
+exists. Some materials are
+intentionally transparent, glowing, or additive — look from another
+angle or against a darker background.</td></tr>
+<tr><td>The animation doesn't move</td>
+<td>On the Animations tab use <strong>Import + Play</strong>, or choose an
+exact clip on the Character tab and import it.
+The first path starts playback automatically; the Character-tab path bakes
+the keys and waits for Maya's Play button. Some clips move only part of the
+body.</td></tr>
+<tr><td>Sound is silent</td>
+<td>That's normal — sounds import as Maya audio nodes but don't auto-play,
+and in-game volume/looping behavior isn't simulated. Use the time slider's
+audio options for review.</td></tr>
+<tr><td>An import failed partway</td>
+<td>The scene may contain a partial result. Check the Result panel and
+<strong>Open Log</strong> for the reason, then start a new scene before
+trying again — don't import repeatedly into the partial scene.</td></tr>
+<tr><td>Maya is slow after a level import</td>
+<td>Full levels are big. Hide what you don't need with the Show-in-scene
+checkboxes, keep one level per scene, and save before importing.</td></tr>
+<tr><td>The window is gone</td>
+<td>Reopen it from the <strong>KotOR</strong> menu or the shelf
+button.</td></tr>
+<tr><td>Maya won't let the plug-in unload</td>
+<td>The current scene still uses the importer's materials. Save if needed,
+start a new scene, then unload.</td></tr>
+</table>
+
+<h2 id="faq">FAQ</h2>
+
+<table>
+<tr><th>Question</th><th>Answer</th></tr>
+<tr><td>Can it export back to the game?</td>
+<td>No. This tool is import-only, by design.</td></tr>
+<tr><td>Does it work with KotOR II?</td>
+<td>No. KotOR 1 only — don't point it at a KotOR II installation.</td></tr>
+<tr><td>Other Maya versions?</td>
+<td>It is built for Maya 2024 on Windows, 64-bit. Other versions are not
+supported.</td></tr>
+<tr><td>Does it see my installed mods?</td>
+<td>It reads the game's original data files. Loose files in the game's
+<code>Override</code> folder are not used.</td></tr>
+<tr><td>Where do the textures go?</td>
+<td>Into
+<code>Documents/maya/KotorMayaImporterCache/V114/&lt;label&gt;</code>. The UI
+creates and reuses this automatically. Your Maya scene references textures
+from there, so keep the folder (or repath the file nodes if you move it).</td></tr>
+<tr><td>Is this legal to use?</td>
+<td>The package contains no game assets and reads only your own installed
+copy. Anything it writes to the managed cache is derived from your copy —
+keep it for personal use and don't redistribute it.</td></tr>
+<tr><td>Why can't I undo an import?</td>
+<td>Imports create thousands of objects; undo support for that is
+impractical. Save important Maya work before importing. The UI does not
+discard or clear the scene automatically.</td></tr>
+</table>
+
+<footer>
+<p>KotOR Maya Importer (V114). A fan-made tool, not affiliated with,
+endorsed by, or supported by Lucasfilm, Disney, BioWare, Aspyr, or
+Autodesk. All trademarks are the property of their respective owners.
+Provided free of charge, as-is, without warranty of any kind.</p>
+</footer>
+
+</body>
+</html>

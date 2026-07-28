@@ -1,0 +1,85 @@
+// KotOR punch-through material for Maya Viewport 2.0.
+//
+// Retail Material::SetBlendingMode selects GL_ONE/GL_ZERO, keeps depth
+// testing and depth writes enabled, and calls:
+//     glAlphaFunc(GL_GREATER, 0.349999994)
+// for the executable's initial punch-through alpha-test state.
+
+uniform texture2D map
+<
+    string UIName = "KotOR Diffuse Texture";
+    string UIWidget = "FilePicker";
+    string ResourceType = "2D";
+    string ResourceName = "";
+>;
+
+uniform sampler2D mapSampler = sampler_state
+{
+    Texture = <map>;
+    TEXTURE_MIN_FILTER = LINEAR_MIPMAP_LINEAR;
+    TEXTURE_MAG_FILTER = LINEAR;
+    TEXTURE_WRAP_S = REPEAT;
+    TEXTURE_WRAP_T = REPEAT;
+};
+
+uniform vec3 colorGain = {1.0, 1.0, 1.0};
+uniform float alphaGain = 1.0;
+uniform float alphaThreshold = 0.349999994;
+uniform mat4 WorldViewProjection : worldviewprojection;
+
+attribute vertexInS
+{
+    vec3 Pm : POSITION;
+    vec2 mayaUVIn : TEXCOORD0;
+}
+
+attribute vertOutS
+{
+    vec2 U0 : TEXCOORD0;
+}
+
+GLSLShader reqdVtxFormat_VS
+{
+    void main()
+    {
+        // MTextureManager-backed custom effects use the graphics texture origin,
+        // while Maya supplies TEXCOORD0 in Maya's image-space convention.  The
+        // canonical KotOR UV stream remains untouched; normalize only at this
+        // custom shader boundary (the same Y flip used by Maya's SDK effects).
+        VS_OUT.U0 = vec2(mayaUVIn.x, 1.0 - mayaUVIn.y);
+        gl_Position = WorldViewProjection * vec4(Pm, 1.0);
+    }
+}
+
+attribute fragInS
+{
+    vec2 U0 : TEXCOORD0;
+}
+
+attribute fragOutS
+{
+    vec4 ColorOut;
+}
+
+GLSLShader reqdVtxFormat
+{
+    void main()
+    {
+        vec4 sampled = texture(mapSampler, PIX_IN.U0);
+        float sourceAlpha = sampled.a * alphaGain;
+        if (sourceAlpha <= alphaThreshold)
+        {
+            discard;
+        }
+        ColorOut = vec4(sampled.rgb * colorGain, sourceAlpha);
+    }
+}
+
+technique Main
+{
+    pass P0
+    {
+        VertexShader (in vertexInS, out vertOutS VS_OUT) = reqdVtxFormat_VS;
+        PixelShader (in fragInS PIX_IN, out fragOutS) = reqdVtxFormat;
+    }
+}

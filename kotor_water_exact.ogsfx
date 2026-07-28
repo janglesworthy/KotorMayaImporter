@@ -1,0 +1,150 @@
+// KotOR 1 translucent water for Maya Viewport 2.0.
+//
+// Retail FUN_00470860 binds the Material +0x10 bump texture and +0x14 cube,
+// sets the current alpha to Material +0x48 (wateralpha), and uses
+// GL_SRC_ALPHA / GL_ONE_MINUS_SRC_ALPHA when wateralpha is below 1.0.
+// The bounded K1 path does not sample the framebuffer for refraction.
+
+uniform texture2D normalMap
+<
+    string UIName = "KotOR Retail Normal Raster";
+    string UIWidget = "FilePicker";
+    string ResourceType = "2D";
+    string ResourceName = "";
+>;
+
+uniform sampler2D normalMapSampler = sampler_state
+{
+    Texture = <normalMap>;
+    TEXTURE_MIN_FILTER = LINEAR_MIPMAP_LINEAR;
+    TEXTURE_MAG_FILTER = LINEAR;
+    TEXTURE_WRAP_S = REPEAT;
+    TEXTURE_WRAP_T = REPEAT;
+};
+
+uniform textureCube cubeMap
+<
+    string UIName = "KotOR D3D9 Cubemap";
+    string UIWidget = "FilePicker";
+    string ResourceType = "Cube";
+    string ResourceName = "";
+>;
+uniform samplerCube cubeMapSampler = sampler_state
+{
+    Texture = <cubeMap>;
+    TEXTURE_MIN_FILTER = LINEAR_MIPMAP_LINEAR;
+    TEXTURE_MAG_FILTER = LINEAR;
+};
+
+uniform float waterAlpha = 0.75;
+uniform float cycleFrame = 0.0;
+uniform float cycleNumX = 1.0;
+uniform float cycleNumY = 1.0;
+uniform mat4 World : world;
+uniform mat4 WorldViewProjection : worldviewprojection;
+uniform mat4 ViewInverse : viewinverse;
+
+attribute vertexInS
+{
+    vec3 Pm : POSITION;
+    vec4 encodedTm : COLOR0;
+    vec4 encodedBm : COLOR1;
+    vec4 encodedNm : COLOR2;
+    vec2 mayaUVIn : TEXCOORD0;
+}
+
+attribute vertOutS
+{
+    vec2 U0 : TEXCOORD0;
+    vec3 Pw : TEXCOORD1;
+    vec3 Nw : TEXCOORD2;
+    vec3 Tw : TEXCOORD3;
+    vec3 Bw : TEXCOORD4;
+}
+
+GLSLShader reqdVtxFormat_VS
+{
+    void main()
+    {
+        vec4 worldPosition = World * vec4(Pm, 1.0);
+        // MTextureManager uses graphics-origin images; Maya's TEXCOORD0 uses
+        // image-space origin. Normalize at this custom shader boundary only.
+        VS_OUT.U0 = vec2(mayaUVIn.x, 1.0 - mayaUVIn.y);
+        VS_OUT.Pw = worldPosition.xyz;
+        // The retail ARB programs consume all three MDX basis vectors as
+        // independent vertex.attrib[12..14] values.  Decode Maya's unclamped
+        // color-set transport and preserve those authored vectors; do not
+        // synthesize B or orthogonalize T against N.
+        vec3 Tm = encodedTm.rgb * 2.0 - 1.0;
+        vec3 Bm = encodedBm.rgb * 2.0 - 1.0;
+        vec3 Nm = encodedNm.rgb * 2.0 - 1.0;
+        VS_OUT.Nw = mat3(World) * Nm;
+        VS_OUT.Tw = mat3(World) * Tm;
+        VS_OUT.Bw = mat3(World) * Bm;
+        gl_Position = WorldViewProjection * vec4(Pm, 1.0);
+    }
+}
+
+attribute fragInS
+{
+    vec2 U0 : TEXCOORD0;
+    vec3 Pw : TEXCOORD1;
+    vec3 Nw : TEXCOORD2;
+    vec3 Tw : TEXCOORD3;
+    vec3 Bw : TEXCOORD4;
+}
+
+attribute fragOutS
+{
+    vec4 ColorOut;
+}
+
+GLSLShader reqdVtxFormat
+{
+    void main()
+    {
+        float numX = max(cycleNumX, 1.0);
+        float numY = max(cycleNumY, 1.0);
+        float frameCount = numX * numY;
+        float frameIndex = mod(floor(cycleFrame + 0.5), frameCount);
+        vec2 frameCell = vec2(
+            mod(frameIndex, numX),
+            floor(frameIndex / numX)
+        );
+        // Retail FUN_00424980 crops x=(index%numx), y=(index/numx)
+        // before bump conversion. The derived normal atlas retains that exact
+        // bottom-origin, row-major layout.
+        vec2 cycleUV = (fract(PIX_IN.U0) + frameCell) / vec2(numX, numY);
+        vec3 tangentNormal = normalize(
+            texture2D(normalMapSampler, cycleUV).rgb * 2.0 - 1.0
+        );
+        vec3 worldNormal = normalize(
+            PIX_IN.Tw * tangentNormal.x
+            + PIX_IN.Bw * tangentNormal.y
+            + PIX_IN.Nw * tangentNormal.z
+        );
+        vec3 eyeToSurface = PIX_IN.Pw - ViewInverse[3].xyz;
+        vec3 reflected = textureCube(
+            cubeMapSampler,
+            normalize(reflect(eyeToSurface, worldNormal))
+        ).rgb;
+        float alpha = clamp(waterAlpha, 0.0, 1.0);
+        // The project VP2 override installs the retail function's traced
+        // straight-alpha GL_SRC_ALPHA / GL_ONE_MINUS_SRC_ALPHA state.
+        ColorOut = vec4(reflected, alpha);
+    }
+}
+
+technique Main
+<
+    string Transparency = "Transparent";
+    string supportsAdvancedTransparency = "false";
+    string variableNameAsAttributeName = "true";
+>
+{
+    pass P0
+    {
+        VertexShader (in vertexInS, out vertOutS VS_OUT) = reqdVtxFormat_VS;
+        PixelShader (in fragInS PIX_IN, out fragOutS) = reqdVtxFormat;
+    }
+}

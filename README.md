@@ -1,7 +1,8 @@
 # KotOR Maya Importer (V114)
 
-Import characters, standalone props, animations, and complete levels from **Star Wars: Knights
-of the Old Republic** into **Autodesk Maya 2024**.
+**KotOR Maya Importer** is a compiled **Star Wars: Knights of the Old Republic
+(KotOR) MDL/MDX importer** for **Autodesk Maya 2024**. It imports characters,
+standalone props, animations, and complete Odyssey-engine levels.
 
 The importer reads your own installed copy of the game directly. Nothing from
 the game is included in this package, and the tool never writes to your game

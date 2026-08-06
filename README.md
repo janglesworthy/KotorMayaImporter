@@ -1,5 +1,7 @@
 # KotOR Level Editor for Maya
 
+![The KotOR Level Editor running in Autodesk Maya, with a KotOR level imported and the editor windows open](media/editor.jpg)
+
 **KotOR Level Editor** is a compiled **Star Wars: Knights of the Old
 Republic** toolkit for **Autodesk Maya 2024 and 2027**. It imports
 characters, props, animations and complete Odyssey-engine levels — and

@@ -1,6 +1,6 @@
 """KotOR Level Editor (beta) - installer.
 
-Drag this file into the Maya 2027 viewport to install.
+Drag this file into the Maya 2027.2 viewport to install.
 
 It copies the toolkit into your Maya user folder, registers it so the
 plug-in appears in the Plug-in Manager, and adds a KotOR menu and shelf
@@ -13,7 +13,7 @@ import sys
 
 PACKAGE_NAME = "KotorLevelEditor"
 PACKAGE_VERSION = "1.0.0"
-MAYA_VERSION = "2027"
+MAYA_VERSION = "2027.2"
 PLUGIN_FILE = "kotorImporterV114.mll"
 UI_MODULES = (
     "kotor_importer_ui_v114",

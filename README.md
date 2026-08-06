@@ -45,7 +45,7 @@ the game. Drag **uninstall.py** into the viewport to remove everything.
 | Window | What it does |
 |---|---|
 | **Level Editor** | Import a module, see every placed marker, move waypoints/sounds/stores/items, place new objects and NPCs, export patched modules |
-| **Asset Browser** | Every template in the game, searchable, with 2,400+ rendered thumbnails; place assets into the level |
+| **Asset Browser** | Every template in the game, searchable, with thumbnails rendered from your own install; place assets into the level |
 | **Level Outliner** | Flat, searchable list of everything placed in the imported level |
 | **Template Editor** | Tabbed editor for any asset: properties, editable fields, loot/inventory; save as a copy or as a brand-new template |
 | **Item Browser** | Every item in the game with real names, descriptions and editable stats |

@@ -41,7 +41,7 @@ New here? Start with the **[Tutorial](docs/TUTORIAL.md)**. Stuck? See
 | Window | What it does |
 |---|---|
 | **Level Editor** | Import a module, see every placed marker, move waypoints/sounds/stores/items, place new objects, export patched modules |
-| **Asset Browser** | Every template in the game, organized and searchable, with 2,400+ rendered thumbnails; drag assets into the level |
+| **Asset Browser** | Every template in the game, organized and searchable, with thumbnails rendered from your own install; drag assets into the level |
 | **Level Outliner** | Flat list of everything placed in the imported level, with search and folders |
 | **Template Editor** | Tabbed editor for any asset: properties, editable fields, loot/inventory; save as a copy or as a brand-new template |
 | **Item Browser** | Every item in the game with real names, descriptions, and editable stats |

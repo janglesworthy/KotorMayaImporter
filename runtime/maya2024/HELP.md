@@ -60,8 +60,16 @@ blind (e.g. `warp danm13`).
   variants into one card with a variant picker.
 - **Place** — drop the selected template into the imported level.
 - **Edit Asset** / right-click — open it in the Template Editor.
-- **Rescan** rebuilds the catalog; **Refresh Previews** regenerates
-  thumbnails (runs outside Maya; safe to keep working).
+- **Generate Thumbnails** renders the card thumbnails from your own
+  game files. Thumbnails are pictures of your installed assets, so
+  they cannot ship with the toolkit - press this once after
+  installing. It runs as a background batch in its own Maya
+  processes, never in your session, so you can keep working; cards
+  fill in as they finish, and it picks up where it left off if you
+  stop it.
+- **Rescan** rebuilds the catalog. **Refresh Markers** rebuilds the
+  preview meshes under markers already placed in your scene - that is
+  about your level, not about the cards.
 
 ## Level Outliner
 
@@ -103,7 +111,7 @@ Cost/StackSize/Charges edits.
 | KotOR menu missing | Re-run the install snippet from the README |
 | Import Level fails immediately | Check the install path; the folder must contain `chitin.key` |
 | Detect finds nothing | There's no imported level in the scene — use Import Level |
-| Thumbnails are placeholder cubes | Press **Refresh Previews** in the Asset Browser and wait for the batch to finish |
+| Cards are blank or show placeholder cubes | Press **Generate Thumbnails** in the Asset Browser and let the batch finish - this is the one-time render of your own game assets |
 | Save refused: "resref already exists" | Pick a different new-template name |
 | Save refused: "plugin is older" | Restart Maya so the current plug-in build loads |
 | Placed NPC isn't interactive in game | Known beta limitation — added NPCs render but don't respond yet |

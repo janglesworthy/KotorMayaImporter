@@ -11,6 +11,14 @@ Follow the Installation steps in the [README](../README.md): load the
 the game's console for testing: in `swkotor.ini` under
 `[Game Options]`, add `EnableCheats=1`.
 
+Then start the thumbnails: **KotOR menu > Asset Browser...** and press
+**Generate Thumbnails**. The browser's cards are renders of the assets
+in *your* game folder, so they cannot ship with the toolkit and have to
+be made once on your machine. The batch runs in separate background
+Maya processes - it never touches the session you are working in - so
+start it now and carry straight on with step 1. Cards fill in as it
+goes, and stopping it early is fine; it resumes where it left off.
+
 ## 1. Import a level
 
 1. **KotOR menu > Level Editor...**
@@ -96,7 +104,7 @@ carry nothing.)
 |---|---|
 | Exported modules | your chosen output folder |
 | Template Editor saves | `work\w8_ui_out\` |
-| Thumbnails | `work\asset_thumbs\` (Refresh Previews regenerates) |
+| Thumbnails | `Documents\KotorLevelEditor\asset_thumbs\` (Generate Thumbnails fills it) |
 
 **Golden rule:** back up any module file before overwriting it, and
 restore backups when you finish testing.

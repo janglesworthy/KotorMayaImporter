@@ -104,22 +104,26 @@ def uninstall():
         except Exception:
             pass
 
-    user_dir = cmds.internalVar(userAppDir=True)
+    app_dir = cmds.internalVar(userAppDir=True)
+    version_dir = os.path.join(app_dir, str(cmds.about(version=True)))
     removed, kept = [], []
-    for package in (PACKAGE_NAME, LEGACY_PACKAGE):
-        target = os.path.join(user_dir, package)
-        mod_file = os.path.join(user_dir, "modules", package + ".mod")
-        for path in (mod_file, target):
-            if not os.path.exists(path):
-                continue
-            try:
-                if os.path.isdir(path):
-                    shutil.rmtree(path)
-                else:
-                    os.remove(path)
-                removed.append(path)
-            except OSError:
-                kept.append(path)
+    targets = []
+    for root in (version_dir, app_dir):   # current layout, then legacy
+        for package in (PACKAGE_NAME, LEGACY_PACKAGE):
+            targets.append(os.path.join(root, "modules",
+                                        package + ".mod"))
+            targets.append(os.path.join(root, package))
+    for path in targets:
+        if not os.path.exists(path):
+            continue
+        try:
+            if os.path.isdir(path):
+                shutil.rmtree(path)
+            else:
+                os.remove(path)
+            removed.append(path)
+        except OSError:
+            kept.append(path)
 
     if kept:
         message = ("Partly removed.\n\nThese files are still in use:\n"

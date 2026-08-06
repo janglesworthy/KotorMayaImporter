@@ -122,7 +122,11 @@ def install():
             button=["OK"], icon="critical")
         return
 
-    user_dir = cmds.internalVar(userAppDir=True)
+    # Install VERSION-SCOPED (Documents/maya/<version>/...), never the
+    # shared Documents/maya/ root: the plug-in is built per Maya
+    # version, so 2024 and 2027 must not see each other's binary.
+    user_dir = os.path.join(cmds.internalVar(userAppDir=True),
+                            str(cmds.about(version=True)))
     dest = os.path.join(user_dir, PACKAGE_NAME)
     if os.path.isdir(dest):
         choice = cmds.confirmDialog(

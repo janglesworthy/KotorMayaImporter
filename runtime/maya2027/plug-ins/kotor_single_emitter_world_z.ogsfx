@@ -1,0 +1,116 @@
+// KotOR 1 Single / Aligned_to_World_Z / Lighten EMITTER projection.
+//
+// The source node supplies the persistent particle center.  Its authored size
+// controllers are represented by the local X/Z quad half extents.  The vertex
+// shader keeps Z aligned to world Z and derives the horizontal axis from the
+// current camera, matching the retail mode-5 draw path.  Atlas selection is
+// driven from the source X/Y grid and source FPS by the Maya shader node.
+
+uniform texture2D map
+<
+    string UIName = "KotOR EMITTER Atlas";
+    string UIWidget = "FilePicker";
+    string ResourceType = "2D";
+    string ResourceName = "";
+>;
+
+uniform sampler2D mapSampler = sampler_state
+{
+    Texture = <map>;
+    TEXTURE_MIN_FILTER = LINEAR_MIPMAP_LINEAR;
+    TEXTURE_MAG_FILTER = LINEAR;
+    TEXTURE_WRAP_S = CLAMP;
+    TEXTURE_WRAP_T = CLAMP;
+};
+
+uniform float cycleFrame = 0.0;
+uniform float gridX = 1.0;
+uniform float gridY = 1.0;
+uniform vec3 colorGain = {1.0, 1.0, 1.0};
+uniform float alphaGain = 1.0;
+uniform mat4 World : world;
+uniform mat4 ViewInverse : viewinverse;
+uniform mat4 ViewProjection : viewprojection;
+
+attribute vertexInS
+{
+    vec3 Pm : POSITION;
+    vec2 mayaUVIn : TEXCOORD0;
+}
+
+attribute vertOutS
+{
+    vec2 U0 : TEXCOORD0;
+}
+
+GLSLShader emitterWorldZVS
+{
+    void main()
+    {
+        vec3 centerWorld = (World * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
+        vec3 cameraWorld = vec3(
+            ViewInverse[0][3],
+            ViewInverse[1][3],
+            ViewInverse[2][3]
+        );
+        vec3 toCamera = cameraWorld - centerWorld;
+        vec3 horizontal = cross(vec3(0.0, 0.0, 1.0), toCamera);
+        if (dot(horizontal, horizontal) < 0.000001)
+        {
+            horizontal = vec3(1.0, 0.0, 0.0);
+        }
+        else
+        {
+            horizontal = normalize(horizontal);
+        }
+        vec3 positionWorld = centerWorld +
+            horizontal * Pm.x + vec3(0.0, 0.0, 1.0) * Pm.z;
+        VS_OUT.U0 = vec2(mayaUVIn.x, 1.0 - mayaUVIn.y);
+        gl_Position = ViewProjection * vec4(positionWorld, 1.0);
+    }
+}
+
+attribute fragInS
+{
+    vec2 U0 : TEXCOORD0;
+}
+
+attribute fragOutS
+{
+    vec4 ColorOut;
+}
+
+GLSLShader emitterAtlasPS
+{
+    void main()
+    {
+        float safeGridX = max(gridX, 1.0);
+        float safeGridY = max(gridY, 1.0);
+        float frameCount = safeGridX * safeGridY;
+        float frame = mod(floor(cycleFrame + 0.5), frameCount);
+        float column = mod(frame, safeGridX);
+        float row = floor(frame / safeGridX);
+        vec2 localUV = clamp(PIX_IN.U0, vec2(0.0), vec2(0.999999));
+        vec2 atlasUV = vec2(
+            (localUV.x + column) / safeGridX,
+            (localUV.y + row) / safeGridY
+        );
+        vec4 sampled = texture(mapSampler, atlasUV);
+        ColorOut = vec4(
+            sampled.rgb * colorGain,
+            sampled.a * alphaGain
+        );
+    }
+}
+
+technique Main
+<
+    string Transparency = "Transparent";
+>
+{
+    pass P0
+    {
+        VertexShader (in vertexInS, out vertOutS VS_OUT) = emitterWorldZVS;
+        PixelShader (in fragInS PIX_IN, out fragOutS) = emitterAtlasPS;
+    }
+}

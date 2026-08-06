@@ -3,3 +3,6 @@ __pycache__/
 *.ma
 *.mb
 KotorMayaImporterCache/
+
+# The shipped runtime IS compiled bytecode - track it.
+!runtime/**/*.pyc
